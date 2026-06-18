@@ -1,0 +1,22 @@
+# ==========================
+# Project Metadata
+# ==========================
+# Basic information about your Python project as defined by PEP 621
+[project]
+name = "Production-Grade-AI-Agentic-System"                 # The distribution/package name
+version = "1.0.0"                                           # Current project version (semantic versioning recommended)
+description = "A production grade AI agentic system."       # Short description shown on package indexes
+authors = [                                                 # Authors and contributes of the project
+    { name="Adham Allam", email="adham.3llam@gmail.com" }
+]
+readme = "README.md"                                        # README file used for long description
+requires-python = ">=3.13"                                  # Minimum supported Python version
+license = { file = "LICENSE" }                              # License of the project
+keywords = ["chatbot", "ai agentic system"]                 # Keywords used for package discovery and search
+dependencies = [
+    "pydantic-settings>=2.14.1",
+    "python-dotenv>=1.2.2",
+]
+
+[project.urls]                                              # Project repository URL
+Repository = "https://github.com/Ad7amstein/production-grade-ai-agentic-system.git"
