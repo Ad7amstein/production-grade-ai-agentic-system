@@ -14,9 +14,21 @@ requires-python = ">=3.13"                                  # Minimum supported 
 license = { file = "LICENSE" }                              # License of the project
 keywords = ["chatbot", "ai agentic system"]                 # Keywords used for package discovery and search
 dependencies = [
+    "concurrent-log-handler>=0.9.29",
     "pydantic-settings>=2.14.1",
     "python-dotenv>=1.2.2",
+    "structlog>=26.1.0",
 ]
 
 [project.urls]                                              # Project repository URL
 Repository = "https://github.com/Ad7amstein/production-grade-ai-agentic-system.git"
+
+# Setuptools Configuration
+# ==========================
+# Uses the src/ project layout instead of placing packages at the repository root
+[tool.setuptools]
+package-dir = {"" = "src"}                                 # Treat src/ as the root package directory
+
+# Automatically discover Python packages inside src/
+[tool.setuptools.packages.find]
+where = ["src"]                                            # Search for packages under src/
