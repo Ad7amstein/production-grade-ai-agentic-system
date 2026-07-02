@@ -184,6 +184,17 @@ class Settings(BaseSettings):
     LOG_MAX_BYTES: Optional[int] = Field(default=10 * 1024 * 1024)  # 10 MB
     LOG_BACKUP_COUNT: Optional[int] = Field(default=10)
 
+    # ==========================
+    # Database (PostgreSQL)
+    # ==========================
+    POSTGRES_HOST: str = Field(...)
+    POSTGRES_DB: str = Field(...)
+    POSTGRES_USER: str = Field(...)
+    POSTGRES_PORT: int = Field(...)
+    POSTGRES_PASSWORD: str = Field(...)
+    POSTGRES_POOL_SIZE: int = Field(...)
+    POSTGRES_MAX_OVERFLOW: int = Field(...)
+
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
     @model_validator(mode="after")
