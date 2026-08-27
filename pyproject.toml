@@ -14,6 +14,11 @@ requires-python = ">=3.13"                                  # Minimum supported 
 license = { file = "LICENSE" }                              # License of the project
 keywords = ["chatbot", "ai agentic system"]                 # Keywords used for package discovery and search
 dependencies = [
+    # --- Web framework & server ---
+    "fastapi>=0.121.0",                                     # High-performance async web framework
+    "uvicorn>=0.34.0",                                      # ASGI server used to run FastAPI
+    "uvloop>=0.22.1",                                       # Faster event loop for asyncio
+
     "concurrent-log-handler>=0.9.29",
     "pydantic-settings>=2.14.1",
     "python-dotenv>=1.2.2",
@@ -24,6 +29,13 @@ dependencies = [
     "sqlalchemy>=2.0.51",                                   # SQL toolkit and ORM
     "alembic>=1.18.4",                                      # Database migration tool for SQLAlchemy
     "asyncpg>=0.31.0",                                      # Async PostgreSQL driver for high-performance database access
+
+    # --- Authentication & security ---
+    "passlib[bcrypt]>=1.7.4",                               # Password hashing utilities
+    "bcrypt>=4.3.0",                                        # Low-level bcrypt hashing
+    "python-jose[cryptography]>=3.4.0",                     # JWT handling and cryptography
+    "email-validator>=2.2.0",                               # Email validation for auth flows
+    "slowapi>=0.1.10",
 ]
 
 # ==========================
