@@ -6,12 +6,13 @@ configuration value parsing.
 """
 
 import os
-from typing import Optional
 from enum import StrEnum
 from pathlib import Path
+from typing import Optional
+
 from dotenv import load_dotenv
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Environment(StrEnum):
@@ -135,9 +136,7 @@ ENV_DEFAULTS = {
 }
 
 
-def parse_list_from_env(
-    env_key: str, delimiter: str = ",", default=None
-) -> list | None:
+def parse_list_from_env(env_key: str, delimiter: str = ",", default=None) -> list | None:
     """Parse an environment variable into a list.
 
     Args:
@@ -172,6 +171,7 @@ class Settings(BaseSettings):
     APP_ENV: Environment = Field(...)
     PROJECT_NAME: str = Field(..., max_length=100)
     VERSION: str = Field(...)
+    API_VERSION: str = Field(...)
     PROJECT_ROOT: str = Field(...)
 
     # ==================================================
@@ -194,6 +194,14 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = Field(...)
     POSTGRES_POOL_SIZE: int = Field(...)
     POSTGRES_MAX_OVERFLOW: int = Field(...)
+
+    # ==========================
+    # JWT Settings
+    # ==========================
+    JWT_SECRET_KEY: str = Field(...)
+    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(...)
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(...)
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
@@ -239,10 +247,7 @@ class Settings(BaseSettings):
 
         normalized_env = aliases.get(str(value).lower())
         if normalized_env is None:
-            raise ValueError(
-                f"Invalid APP_ENV '{value}'."
-                f"Expected one of: {', '.join(sorted(aliases.keys()))}"
-            )
+            raise ValueError(f"Invalid APP_ENV '{value}'." f"Expected one of: {', '.join(sorted(aliases.keys()))}")
 
         return normalized_env
 
@@ -253,9 +258,7 @@ settings = Settings()  # type: ignore
 
 def main():
     """Entry Point for the Program."""
-    print(
-        f"Welcome from `{os.path.basename(__file__).split('.')[0]}` Module. Nothing to do ^_____^!"
-    )
+    print(f"Welcome from `{os.path.basename(__file__).split('.')[0]}` Module. Nothing to do ^_____^!")
     for key, value in settings.model_dump().items():
         print(f"{key}: {value}")
 
