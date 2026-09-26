@@ -12,6 +12,7 @@ from data.schemas.base import SQLAlchemyBase
 
 if TYPE_CHECKING:
     from data.schemas.chat_session import ChatSession
+    from data.schemas.user_sesssion import UserSession
 
 
 class User(SQLAlchemyBase):
@@ -29,6 +30,8 @@ class User(SQLAlchemyBase):
             to ``False``.
         chat_sessions (list[ChatSession]): One-to-many relationship to
             ``ChatSession``; cascades delete-orphan.
+        user_sessions (list[UserSession]): One-to-many relationship to
+            ``UserSession``; cascades delete-orphan.
     """
 
     __tablename__ = "users"
@@ -76,6 +79,12 @@ class User(SQLAlchemyBase):
     chat_sessions: Mapped[list["ChatSession"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+
+    user_sessions: Mapped[list["UserSession"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
