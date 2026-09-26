@@ -179,6 +179,7 @@ class Settings(BaseSettings):
     # Logging Settings
     # ==================================================
     DEBUG: Optional[bool] = Field(default=None)
+    DEBUG_DB: Optional[bool] = Field(default=False)
     LOG_LEVEL: Optional[LogLevel] = Field(default=None)
     LOG_RENDERER: Optional[LogRenderer] = Field(default=None)
     LOG_DIR: Optional[str] = Field(default="storage/logs")
@@ -203,6 +204,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = Field(default="HS256")
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(...)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(...)
+    SESSION_ABSOLUTE_LIFETIME_DAYS: int = Field(...)
 
     # ==========================
     # Rate Limiting Settings
