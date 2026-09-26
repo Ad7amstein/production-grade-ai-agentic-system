@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
+from limits.util import parse_many
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -203,6 +204,20 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(...)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(...)
 
+    # ==========================
+    # Rate Limiting Settings
+    # ==========================
+    RATE_LIMIT_DEFAULT: str = Field(default="100 per minute")
+    RATE_LIMIT_HEALTH: str = Field(default="300 per minute")
+    RATE_LIMIT_REGISTER: str = Field(default="5 per minute, 20 per hour")
+    RATE_LIMIT_LOGIN: str = Field(default="10 per minute, 50 per hour")
+    RATE_LIMIT_REFRESH: str = Field(default="60 per minute, 500 per hour")
+    RATE_LIMIT_CREATE_CHAT_SESSION: str = Field(default="30 per minute")
+    RATE_LIMIT_GET_CHAT_SESSIONS: str = Field(default="120 per minute")
+    RATE_LIMIT_GET_CHAT_SESSION: str = Field(default="120 per minute")
+    RATE_LIMIT_UPDATE_CHAT_SESSION: str = Field(default="30 per minute")
+    RATE_LIMIT_DELETE_CHAT_SESSION: str = Field(default="20 per minute")
+
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
     @model_validator(mode="after")
@@ -218,6 +233,18 @@ class Settings(BaseSettings):
             if getattr(self, key, None) is None:
                 setattr(self, key, value)
 
+        return self
+
+    @model_validator(mode="after")
+    def validate_rate_limits(self):
+        """Validate all rate limit strings at startup."""
+        for field in self.__class__.model_fields.keys():
+            if field.startswith("RATE_LIMIT_"):
+                value = getattr(self, field)
+                try:
+                    parse_many(value)
+                except Exception as exc:
+                    raise ValueError(f"Invalid rate limit string for {field}: {value!r}") from exc
         return self
 
     @field_validator("APP_ENV", mode="before")
