@@ -11,8 +11,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from structlog.contextvars import clear_contextvars
 
-from system.logs import logger
-
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
     """Middleware that clears structlog contextvars around each request."""
@@ -28,13 +26,10 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         Returns:
             Response: The response produced downstream.
         """
-        logger.info("clearning_context_1")
         clear_contextvars()
         try:
-            logger.info("calling_next")
             return await call_next(request)
         finally:
-            logger.info("clearning_context_2")
             clear_contextvars()
 
 
