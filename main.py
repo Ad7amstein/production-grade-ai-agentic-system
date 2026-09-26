@@ -4,11 +4,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.v1 import v1_router
 from config.settings import settings
 from data.db_manager import db_manager
 from system.logs import logger
+from system.middleware import RequestContextMiddleware
+from system.rate_limit import limiter
 
 
 @asynccontextmanager
@@ -39,6 +43,9 @@ app = FastAPI(
 )
 
 app.include_router(v1_router)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
+app.add_middleware(RequestContextMiddleware)
 
 
 @app.exception_handler(ConnectionRefusedError)

@@ -18,8 +18,8 @@ from structlog.contextvars import bind_contextvars
 from config.settings import settings
 from data.db_manager import db_manager
 from data.models.auth import Token
-from data.repositories import UserRepository
-from data.schemas import User
+from data.repositories import UserSessionRepository
+from data.schemas import User, UserSession
 from system.logs import logger
 
 security = HTTPBearer()
@@ -50,11 +50,15 @@ def verify_password(plain: str, hashed: str) -> bool:
     return _bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
-def create_token_pair(id: str, expires_delta: Optional[timedelta] = None) -> Token:
-    """Create a JWT access/refresh token pair for the given subject.
+def create_token_pair(id: str, sid: str, expires_delta: Optional[timedelta] = None) -> Token:
+    """Create a JWT access/refresh token pair for the given subject and session.
+
+    Both tokens carry the same ``sid``, so revoking that session's row
+    invalidates the access and refresh token together.
 
     Args:
         id: Subject identifier (user ID) encoded in the token claims.
+        sid: ``UserSession.id`` this pair belongs to.
         expires_delta: Custom access token lifetime. Defaults to
             ``JWT_ACCESS_TOKEN_EXPIRE_MINUTES`` from settings.
 
@@ -68,6 +72,7 @@ def create_token_pair(id: str, expires_delta: Optional[timedelta] = None) -> Tok
 
     access_claims = {
         "sub": id,
+        "sid": sid,
         "exp": access_expire,
         "iat": now,
         "jti": f"{id}-{now.timestamp()}",
@@ -75,6 +80,7 @@ def create_token_pair(id: str, expires_delta: Optional[timedelta] = None) -> Tok
     }
     refresh_claims = {
         "sub": id,
+        "sid": sid,
         "exp": refresh_expire,
         "iat": now,
         "jti": f"{id}-refresh-{now.timestamp()}",
@@ -84,7 +90,7 @@ def create_token_pair(id: str, expires_delta: Optional[timedelta] = None) -> Tok
     access_token = jwt.encode(access_claims, settings.JWT_SECRET_KEY, settings.JWT_ALGORITHM)
     refresh_token = jwt.encode(refresh_claims, settings.JWT_SECRET_KEY, settings.JWT_ALGORITHM)
 
-    logger.info("token_pair_created", id=id, access_expires_at=access_expire.isoformat())
+    logger.info("token_pair_created", id=id, sid=sid, access_expires_at=access_expire.isoformat())
 
     return Token(
         access_token=access_token,
@@ -94,29 +100,26 @@ def create_token_pair(id: str, expires_delta: Optional[timedelta] = None) -> Tok
     )
 
 
-def verify_token(token: str, token_type: str = "access") -> Optional[str]:
-    """Decode and validate a JWT, returning the subject claim on success.
+def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
+    """Decode and validate a JWT, returning its claims on success.
 
     Args:
         token: Encoded JWT string to verify.
         token_type: Expected ``type`` claim value (``"access"`` or ``"refresh"``).
 
     Returns:
-        The ``sub`` claim (user ID) if the token is valid and type matches, ``None`` otherwise.
+        The decoded claims (``sub``, ``sid``, ``exp``, ``iat``, ``jti``, ``type``)
+        if the token is valid and its type matches, ``None`` otherwise.
     """
-    try:
-        if not token or not isinstance(token, str):
-            logger.warning("token_invalid_format")
-            return None
+    if not token or not isinstance(token, str):
+        logger.warning("token_invalid_format")
+        return None
 
+    try:
         claims = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         id: str | None = claims.get("sub")
-        if id is None:
+        if id is None or not isinstance(id, str):
             logger.warning("token_missing_id")
-            return None
-
-        if not isinstance(id, str):
-            logger.warning("token_invalid_subject")
             return None
 
         if claims.get("type") != token_type:
@@ -124,7 +127,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[str]:
             return None
 
         logger.debug("token_verified", id=id, token_type=token_type)
-        return id
+        return claims
 
     except ExpiredSignatureError:
         logger.info("token_expired")
@@ -139,22 +142,44 @@ def verify_token(token: str, token_type: str = "access") -> Optional[str]:
         return None
 
 
-async def get_current_user(
+def session_id_from(claims: dict) -> Optional[UUID]:
+    """Extract and parse the ``sid`` claim from decoded token claims.
+
+    Args:
+        claims: Claims returned by ``verify_token``.
+
+    Returns:
+        The session UUID, or ``None`` if the claim is missing or malformed.
+    """
+    sid = claims.get("sid")
+    if not isinstance(sid, str):
+        return None
+    try:
+        return UUID(sid)
+    except ValueError:
+        return None
+
+
+async def get_current_session(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db_session: AsyncSession = Depends(db_manager.get_db_session),
-) -> User:
-    """FastAPI dependency returning the authenticated, active user for the current request.
+) -> UserSession:
+    """FastAPI dependency returning the live session behind the current request.
+
+    A token is only usable while its session row is live, so rotating or
+    revoking that row invalidates the access token immediately rather than
+    leaving it valid until expiry.
 
     Args:
         credentials: Bearer token extracted by HTTPBearer.
         db_session: Async database session injected by FastAPI.
 
     Returns:
-        The authenticated and active User instance.
+        The live UserSession, with its owning ``user`` eager-loaded.
 
     Raises:
-        HTTPException: 401 if the token is invalid or the user does not exist.
-        HTTPException: 403 if the account is inactive.
+        HTTPException: 401 if the token is invalid, or its session has been
+            revoked, has expired, or never existed.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -162,26 +187,42 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    user_id = verify_token(credentials.credentials)
-    if user_id is None:
+    claims = verify_token(credentials.credentials)
+    if claims is None:
         raise credentials_exception
 
-    try:
-        uid = UUID(user_id)
-    except ValueError:
+    session_id = session_id_from(claims)
+    if session_id is None:
         raise credentials_exception
 
-    user = await UserRepository(db_session).get(uid)
-    if user is None:
+    session = await UserSessionRepository(db_session).get_live(session_id)
+    if session is None:
+        logger.info("session_not_live", session_id=str(session_id))
         raise credentials_exception
 
+    bind_contextvars(user_id=str(session.user_id), session_id=str(session.id))
+    return session
+
+
+async def get_current_user(session: UserSession = Depends(get_current_session)) -> User:
+    """FastAPI dependency returning the authenticated, active user for the current request.
+
+    Delegates session validity to ``get_current_session`` so every
+    authenticated route shares the same live-session check, not just the
+    ones that use the session directly.
+
+    Args:
+        session: The live session behind the request, with ``user`` eager-loaded.
+
+    Returns:
+        The authenticated and active User instance.
+
+    Raises:
+        HTTPException: 403 if the account is inactive.
+    """
+    user = session.user
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account disabled",
-        )
-
-    bind_contextvars(user_id=str(user.id))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
     return user
 
 

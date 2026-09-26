@@ -49,7 +49,7 @@ class DatabaseManager:
                 max_overflow=settings.POSTGRES_MAX_OVERFLOW,
                 pool_timeout=30,
                 pool_recycle=1800,
-                echo=settings.DEBUG,
+                echo=settings.DEBUG_DB,
             )
 
             self.session_factory = async_sessionmaker(

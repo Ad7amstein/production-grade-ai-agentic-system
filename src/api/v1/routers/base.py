@@ -2,16 +2,18 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 
 from config.settings import settings
 from system.logs import logger
+from system.rate_limit import limiter
 
 router = APIRouter()
 
 
 @router.get("/health")
-async def health_check():
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def health_check(request: Request, response: Response):
     """Return application health status.
 
     Returns:
