@@ -12,7 +12,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from limits.util import parse_many
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -193,14 +193,14 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = Field(...)
     POSTGRES_USER: str = Field(...)
     POSTGRES_PORT: int = Field(...)
-    POSTGRES_PASSWORD: str = Field(...)
+    POSTGRES_PASSWORD: SecretStr = Field(...)
     POSTGRES_POOL_SIZE: int = Field(...)
     POSTGRES_MAX_OVERFLOW: int = Field(...)
 
     # ==========================
     # JWT Settings
     # ==========================
-    JWT_SECRET_KEY: str = Field(...)
+    JWT_SECRET_KEY: SecretStr = Field(...)
     JWT_ALGORITHM: str = Field(default="HS256")
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(...)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(...)
@@ -219,6 +219,21 @@ class Settings(BaseSettings):
     RATE_LIMIT_GET_CHAT_SESSION: str = Field(default="120 per minute")
     RATE_LIMIT_UPDATE_CHAT_SESSION: str = Field(default="30 per minute")
     RATE_LIMIT_DELETE_CHAT_SESSION: str = Field(default="20 per minute")
+
+    # LLM Generation Settings
+    LLM_BASE_URL: str = Field(...)
+    SOVEREIGNEG_API_KEY: SecretStr = Field(...)
+
+    # Generation model settings
+    GENERATION_MODEL: str = Field(...)
+    GENERATION_MODEL_PROVIDER: str = Field(...)
+    GENERATION_MODEL_PROFILE_PROVIDER: str = Field(...)
+    DEFAULT_INPUT_MAX_TOKENS: int = Field(default=16_384, gt=0, lt=1_000_000)
+    DEFAULT_GENERATION_MAX_TOKENS: int = Field(default=2_048, gt=0, lt=16_384)
+    DEFAULT_GENERATION_MAX_RETRIES: int = Field(default=3, ge=0, le=10)
+    LLM_REQUEST_TIMEOUT_SECONDS: float = Field(default=60.0, gt=0)
+    DEFAULT_GENERATION_TEMPERATURE: float = Field(default=0.1, ge=0)
+
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 

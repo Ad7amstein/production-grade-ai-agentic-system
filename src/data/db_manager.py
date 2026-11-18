@@ -37,7 +37,7 @@ class DatabaseManager:
         """
         # Create engine with appropriate pool configuration
         connection_url = (
-            f"postgresql+asyncpg://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
+            f"postgresql+asyncpg://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD.get_secret_value()}"  # pylint: disable=no-member
             f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         )
 
