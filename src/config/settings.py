@@ -12,7 +12,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from limits.util import parse_many
-from pydantic import Field, field_validator, model_validator, SecretStr
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -234,6 +234,9 @@ class Settings(BaseSettings):
     LLM_REQUEST_TIMEOUT_SECONDS: float = Field(default=60.0, gt=0)
     DEFAULT_GENERATION_TEMPERATURE: float = Field(default=0.1, ge=0)
 
+    # Tavily API Settings
+    TAVILY_API_KEY: SecretStr = Field(...)
+    TAVILY_MAX_RESULTS: int = Field(default=3, gt=0, le=20)
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
