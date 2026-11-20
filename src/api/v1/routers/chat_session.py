@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from langchain.agents.middleware import PIIDetectionError
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -216,9 +217,15 @@ async def send_message(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="A message is already being processed for this session"
         )
-    reply = await agent.get_response(
-        payload.content, chat_session_id=str(session_id), user=UserRead.model_validate(current_user)
-    )
+    try:
+        reply = await agent.get_response(
+            payload.content, chat_session_id=str(session_id), user=UserRead.model_validate(current_user)
+        )
+    except PIIDetectionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Message not sent: it contains sensitive data ({error.pii_type}). Remove it and try again.",
+        ) from error
     chat_session.updated_at = func.now()  # pylint: disable=[E1102]
     logger.info("chat_message_answered", chat_session_id=str(session_id), user_id=str(current_user.id))
     return ChatMessageRead(content=reply)
