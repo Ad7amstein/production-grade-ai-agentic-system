@@ -3,13 +3,23 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from langchain.agents.middleware import PIIDetectionError
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import settings
 from data.db_manager import db_manager
-from data.models.chat_session import ChatSessionCreate, ChatSessionRead, ChatSessionUpdate
+from data.models.chat_session import (
+    ChatMessageCreate,
+    ChatMessageRead,
+    ChatSessionCreate,
+    ChatSessionRead,
+    ChatSessionUpdate,
+)
+from data.models.user import UserRead
 from data.repositories import ChatSessionRepository
 from data.schemas.user import User
+from services.agent import agent
 from system.logs import logger
 from system.rate_limit import limiter
 from utils.auth import get_current_user
@@ -164,3 +174,58 @@ async def delete_chat_session(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     await repo.delete(session_id)
     logger.info("chat_session_deleted", session_id=str(session_id), user_id=str(current_user.id))
+
+
+@router.post("/{session_id}/messages", response_model=ChatMessageRead)
+@limiter.limit(settings.RATE_LIMIT_CHAT)
+async def send_message(
+    request: Request,
+    response: Response,
+    session_id: UUID,
+    payload: ChatMessageCreate,
+    current_user: User = Depends(get_current_user),
+    db_session: AsyncSession = Depends(db_manager.get_db_session, scope="function"),
+) -> ChatMessageRead:
+    """Send a message to the agent within a chat session and return its reply.
+
+    Args:
+        request (Request): Incoming request, required by the rate limiter.
+        response (Response): Outgoing response, used by the rate limiter for headers.
+        session_id (UUID): Chat session the message belongs to.
+        payload (ChatMessageCreate): Request body with the user message.
+        current_user (User): Authenticated user from the JWT dependency.
+        db_session (AsyncSession): Injected async database session.
+
+    Returns:
+        ChatMessageRead: The agent's reply.
+
+    Raises:
+        HTTPException: 404 if the session does not exist.
+        HTTPException: 403 if the session belongs to another user.
+        HTTPException: 409 if another message for this session is still being answered.
+        HTTPException: 422 if the message contains blocked PII, such as a credit card number.
+    """
+    repo = ChatSessionRepository(db_session)
+    chat_session = await repo.get(session_id)
+    if chat_session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
+    if chat_session.user_id != current_user.id:
+        logger.warning("chat_session_access_denied", chat_session_id=str(session_id), user_id=str(current_user.id))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if not await repo.try_lock(session_id):
+        logger.warning("chat_session_busy", chat_session_id=str(session_id), user_id=str(current_user.id))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="A message is already being processed for this session"
+        )
+    try:
+        reply = await agent.get_response(
+            payload.content, chat_session_id=str(session_id), user=UserRead.model_validate(current_user)
+        )
+    except PIIDetectionError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Message not sent: it contains sensitive data ({error.pii_type}). Remove it and try again.",
+        ) from error
+    chat_session.updated_at = func.now()  # pylint: disable=[E1102]
+    logger.info("chat_message_answered", chat_session_id=str(session_id), user_id=str(current_user.id))
+    return ChatMessageRead(content=reply)

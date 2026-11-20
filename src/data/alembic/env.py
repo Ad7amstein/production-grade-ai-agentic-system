@@ -21,7 +21,7 @@ config.set_main_option(
     "sqlalchemy.url",
     (
         f"postgresql+psycopg://{settings.POSTGRES_USER}"
-        f":{settings.POSTGRES_PASSWORD}"
+        f":{settings.POSTGRES_PASSWORD.get_secret_value()}"  # pylint: disable=no-member
         f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}"
         f"/{settings.POSTGRES_DB}"
     ),

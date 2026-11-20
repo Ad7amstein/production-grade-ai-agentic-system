@@ -1,4 +1,4 @@
-# pylint: disable=[W0622, W0707]
+# pylint: disable=[W0622, W0707, E1101]
 
 """JWT token creation and verification utilities."""
 
@@ -87,8 +87,8 @@ def create_token_pair(id: str, sid: str, expires_delta: Optional[timedelta] = No
         "type": "refresh",
     }
 
-    access_token = jwt.encode(access_claims, settings.JWT_SECRET_KEY, settings.JWT_ALGORITHM)
-    refresh_token = jwt.encode(refresh_claims, settings.JWT_SECRET_KEY, settings.JWT_ALGORITHM)
+    access_token = jwt.encode(access_claims, settings.JWT_SECRET_KEY.get_secret_value(), settings.JWT_ALGORITHM)
+    refresh_token = jwt.encode(refresh_claims, settings.JWT_SECRET_KEY.get_secret_value(), settings.JWT_ALGORITHM)
 
     logger.info("token_pair_created", id=id, sid=sid, access_expires_at=access_expire.isoformat())
 
@@ -116,7 +116,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
         return None
 
     try:
-        claims = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        claims = jwt.decode(token, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM])
         id: str | None = claims.get("sub")
         if id is None or not isinstance(id, str):
             logger.warning("token_missing_id")

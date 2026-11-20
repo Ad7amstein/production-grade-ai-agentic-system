@@ -36,6 +36,13 @@ dependencies = [
     "python-jose[cryptography]>=3.4.0",                     # JWT handling and cryptography
     "email-validator>=2.2.0",                               # Email validation for auth flows
     "slowapi>=0.1.10",
+
+    # --- LLMs & AI ---
+    "langchain>=1.4.4",
+    "langchain-openai>=1.7.0",
+    "langchain-model-profiles>=0.0.6",
+    "tavily-python>=0.8.5",
+    "langgraph>=1.2.15",
 ]
 
 # ==========================
