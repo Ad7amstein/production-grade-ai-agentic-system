@@ -8,7 +8,7 @@ configuration value parsing.
 import os
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from limits.util import parse_many
@@ -235,6 +235,14 @@ class Settings(BaseSettings):
     LLM_REQUEST_TIMEOUT_SECONDS: float = Field(default=60.0, gt=0)
     DEFAULT_GENERATION_TEMPERATURE: float = Field(default=0.1, ge=0)
 
+    # Summarization model settings
+    SUMMARIZATION_MODEL: Optional[str] = Field(default=None)
+    SUMMARIZATION_MODEL_PROVIDER: Optional[str] = Field(default=None)
+    SUMMARIZATION_MODEL_PROFILE_PROVIDER: Optional[str] = Field(default=None)
+    SUMMARY_MAX_TOKENS: int = Field(default=12_000, gt=0)
+    SUMMARY_MAX_SUMMARY_TOKENS: int = Field(default=1_024, gt=0)
+    SUMMARIZATION_REASONING_EFFORT: Optional[Literal["low", "medium", "high"]] = Field(default="low")
+
     # Tavily API Settings
     TAVILY_API_KEY: SecretStr = Field(...)
     TAVILY_MAX_RESULTS: int = Field(default=3, gt=0, le=20)
@@ -255,6 +263,24 @@ class Settings(BaseSettings):
                 setattr(self, key, value)
 
         return self
+
+    @model_validator(mode="after")
+    def validate_summary_tokens(self) -> "Settings":
+        """Reject a summary cap that does not fit inside the history budget.
+
+        Returns:
+            Settings: The validated settings instance.
+
+        Raises:
+            ValueError: If `SUMMARY_MAX_SUMMARY_TOKENS` is not below `SUMMARY_MAX_TOKENS`.
+        """
+        if self.SUMMARY_MAX_SUMMARY_TOKENS >= self.SUMMARY_MAX_TOKENS:
+            raise ValueError(
+                f"SUMMARY_MAX_SUMMARY_TOKENS ({self.SUMMARY_MAX_SUMMARY_TOKENS}) must be less than "
+                f"SUMMARY_MAX_TOKENS ({self.SUMMARY_MAX_TOKENS})"
+            )
+        return self
+
 
     @model_validator(mode="after")
     def validate_rate_limits(self):
