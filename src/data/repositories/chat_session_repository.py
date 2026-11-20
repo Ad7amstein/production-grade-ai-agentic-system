@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from data.schemas.chat_session import ChatSession
@@ -101,3 +101,21 @@ class ChatSessionRepository:
         await self._db_session.delete(chat_session)
         await self._db_session.flush()
         return True
+
+    async def try_lock(self, chat_session_id: UUID) -> bool:
+        """Take a transaction-scoped Postgres advisory lock on a chat session without waiting.
+
+        The lock is released when the surrounding transaction commits or rolls back, and it is shared
+        across workers because it lives in Postgres.
+
+        Args:
+            chat_session_id (UUID): Chat session to lock.
+
+        Returns:
+            bool: `True` if the lock was taken, `False` if another transaction already holds it.
+        """
+        return bool(
+            await self._db_session.scalar(
+                text("SELECT pg_try_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": str(chat_session_id)}
+            )
+        )

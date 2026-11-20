@@ -52,3 +52,25 @@ class ChatSessionRead(ChatSessionBase):
     user_id: UUID = Field(..., description="UUID of the owning user.")
 
     model_config = {"from_attributes": True}
+
+
+class ChatMessageCreate(BaseModel):
+    """Schema for a user message sent to the agent; surrounding whitespace is stripped, so a blank message is rejected.
+
+    Attributes:
+        content (str): Message text, 1–4000 characters after stripping.
+    """
+
+    content: str = Field(..., min_length=1, max_length=4000, description="User message text.")
+
+    model_config = {"str_strip_whitespace": True}
+
+
+class ChatMessageRead(BaseModel):
+    """Schema for the agent's reply.
+
+    Attributes:
+        content (str): Text of the assistant reply.
+    """
+
+    content: str = Field(..., description="Assistant reply text.")
