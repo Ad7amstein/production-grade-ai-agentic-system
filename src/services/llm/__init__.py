@@ -22,6 +22,7 @@ def build_chat_model(  # pylint: disable=[R0913]
     max_retries: int = settings.DEFAULT_GENERATION_MAX_RETRIES,
     temperature: float = settings.DEFAULT_GENERATION_TEMPERATURE,
     timeout: float = settings.LLM_REQUEST_TIMEOUT_SECONDS,
+    reasoning_effort: str | None = None,
 ) -> BaseChatModel:
     """Build a chat model; connection and sampling arguments default to the generation settings.
 
@@ -35,6 +36,7 @@ def build_chat_model(  # pylint: disable=[R0913]
         max_retries (int): Retries on transient API errors.
         temperature (float): Sampling temperature.
         timeout (float): Seconds before one API call fails, so a stalled upstream cannot hang a request forever.
+        reasoning_effort (str | None): `"low"`, `"medium"` or `"high"` for reasoning models; `None` keeps the default.
 
     Returns:
         BaseChatModel: A LangChain chat model ready for invocation.
@@ -49,6 +51,7 @@ def build_chat_model(  # pylint: disable=[R0913]
         temperature=temperature,
         max_retries=max_retries,
         timeout=timeout,
+        **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),  # type: ignore
     )
     logger.info("llm_created", model=model, max_tokens=max_tokens)
     return chat_model

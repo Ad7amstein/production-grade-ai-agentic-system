@@ -12,6 +12,7 @@ from langchain.agents.middleware import (
     InputAgentState,
     ModelRequest,
     OutputAgentState,
+    SummarizationMiddleware,
     dynamic_prompt,
 )
 from langchain.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, ToolMessage
@@ -73,9 +74,21 @@ class AgenticWorkflow:
             max_tokens=settings.DEFAULT_GENERATION_MAX_TOKENS,
             max_retries=0,
         )
+        self._summary_model = build_chat_model(
+            model=settings.SUMMARIZATION_MODEL,  # type: ignore
+            model_provider=settings.SUMMARIZATION_MODEL_PROVIDER,  # type: ignore
+            profile=MODEL_PROFILES[f"{settings.SUMMARIZATION_MODEL_PROFILE_PROVIDER}/{settings.SUMMARIZATION_MODEL}"],
+            max_tokens=settings.SUMMARY_MAX_SUMMARY_TOKENS,
+            reasoning_effort=settings.SUMMARIZATION_REASONING_EFFORT,
+        )
 
         middleware: list[AgentMiddleware[Any, GraphContext]] = [
             _system_prompt,
+            SummarizationMiddleware(
+                model=self._summary_model,
+                trigger=("tokens", settings.SUMMARY_MAX_TOKENS),
+                keep=("tokens", settings.SUMMARY_MAX_TOKENS // 2),
+            ),
         ]
 
         self._graph: CompiledStateGraph[AgentState, GraphContext, InputAgentState, OutputAgentState] = create_agent(
