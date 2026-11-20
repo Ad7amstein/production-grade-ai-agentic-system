@@ -1,10 +1,19 @@
 """LangChain agent for the web assistant, built with `create_agent` and middleware."""
 
 import time
+from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import AgentState, InputAgentState, OutputAgentState
+from langchain.agents.middleware import (
+    AgentMiddleware,
+    AgentState,
+    InputAgentState,
+    ModelRequest,
+    OutputAgentState,
+    dynamic_prompt,
+)
 from langchain.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
@@ -15,6 +24,7 @@ from data.models.graph import GraphContext
 from data.models.user import UserRead
 from services.agent.tools.search import tavily_search
 from services.llm import MODEL_PROFILES, build_chat_model
+from services.prompts import render_assistant_system_prompt
 from system.logs import logger
 
 
@@ -28,6 +38,24 @@ def _turn_start(messages: list[AnyMessage]) -> int:
         int: Index of the last `HumanMessage`, or 0 if there is none.
     """
     return max((i for i, m in enumerate(messages) if isinstance(m, HumanMessage)), default=0)
+
+
+@dynamic_prompt
+def _system_prompt(request: ModelRequest[GraphContext]) -> str:
+    """Write the user's profile, saved memories, and the current time into the system prompt before every model call.
+
+    Args:
+        request (ModelRequest[GraphContext]): Model call whose run context holds the user and the memory store.
+
+    Returns:
+        str: The rendered system prompt.
+    """
+    user = request.runtime.context.user
+    return render_assistant_system_prompt(
+        user_profile=f"Name: {user.first_name} {user.last_name}; Email: {user.email}",
+        long_term_memory="No memories yet.",
+        current_date_and_time=datetime.now().strftime("%A, %Y-%m-%d %H:%M"),
+    )
 
 
 class AgenticWorkflow:
@@ -46,8 +74,16 @@ class AgenticWorkflow:
             max_retries=0,
         )
 
+        middleware: list[AgentMiddleware[Any, GraphContext]] = [
+            _system_prompt,
+        ]
+
         self._graph: CompiledStateGraph[AgentState, GraphContext, InputAgentState, OutputAgentState] = create_agent(
-            model=self._chat_model, tools=self._tools, checkpointer=InMemorySaver(), context_schema=GraphContext
+            model=self._chat_model,
+            tools=self._tools,
+            checkpointer=InMemorySaver(),
+            context_schema=GraphContext,
+            middleware=middleware,
         )
         logger.info("agent_initialized")
 
