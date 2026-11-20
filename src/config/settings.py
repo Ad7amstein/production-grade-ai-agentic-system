@@ -235,6 +235,26 @@ class Settings(BaseSettings):
     LLM_REQUEST_TIMEOUT_SECONDS: float = Field(default=60.0, gt=0)
     DEFAULT_GENERATION_TEMPERATURE: float = Field(default=0.1, ge=0)
 
+    # Fallback model settings, tried in order when the generation model call fails
+    FALLBACK_MODEL_1: Optional[str] = Field(default=None)
+    FALLBACK_MODEL_1_PROVIDER: Optional[str] = Field(default=None)
+    FALLBACK_MODEL_1_PROFILE_PROVIDER: Optional[str] = Field(default=None)
+    FALLBACK_MODEL_2: Optional[str] = Field(default=None)
+    FALLBACK_MODEL_2_PROVIDER: Optional[str] = Field(default=None)
+    FALLBACK_MODEL_2_PROFILE_PROVIDER: Optional[str] = Field(default=None)
+
+    # Agent-level retries of a failed model call, before falling back to the next model
+    MODEL_CALL_MAX_RETRIES: int = Field(default=2, ge=0, le=10)
+    MODEL_CALL_RETRY_INITIAL_DELAY_SECONDS: float = Field(default=1.0, ge=0)
+
+    # Model call limits; the agent stops with a notice once one is reached
+    MODEL_CALL_RUN_LIMIT: int = Field(default=10, gt=0)
+    MODEL_CALL_THREAD_LIMIT: int = Field(default=0, ge=0)  # 0 means no limit
+
+    # Tool call limits; calls past a limit are blocked and the model answers without them
+    TOOL_CALL_RUN_LIMIT: int = Field(default=5, gt=0)
+    TOOL_CALL_THREAD_LIMIT: int = Field(default=0, ge=0)  # 0 means no limit
+
     # Summarization model settings
     SUMMARIZATION_MODEL: Optional[str] = Field(default=None)
     SUMMARIZATION_MODEL_PROVIDER: Optional[str] = Field(default=None)
@@ -280,7 +300,6 @@ class Settings(BaseSettings):
                 f"SUMMARY_MAX_TOKENS ({self.SUMMARY_MAX_TOKENS})"
             )
         return self
-
 
     @model_validator(mode="after")
     def validate_rate_limits(self):
