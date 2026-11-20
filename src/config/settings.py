@@ -219,6 +219,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_GET_CHAT_SESSION: str = Field(default="120 per minute")
     RATE_LIMIT_UPDATE_CHAT_SESSION: str = Field(default="30 per minute")
     RATE_LIMIT_DELETE_CHAT_SESSION: str = Field(default="20 per minute")
+    RATE_LIMIT_CHAT: str = Field(default="20 per minute")
 
     # LLM Generation Settings
     LLM_BASE_URL: str = Field(...)
